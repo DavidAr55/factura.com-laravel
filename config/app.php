@@ -135,8 +135,9 @@ return [
     */
 
     'factura' => [
-        'host' => env('FACTURA_HOST', 'https://sandbox.factura.com/api'),
-        'key' => env('FACTURA_API_KEY', 'JDJ5JDEwJHNITDlpZ0ZwMzdyd0RCTzFHVXlUOS5XVnlvaFFjd3ZWcnRBZHBIV0Q5QU5xM1Jqc2lpNlVD'),
-        'secret' => env('FACTURA_SECRET_KEY', '')
+        'host' => env('F_HOST', 'https://sandbox.factura.com/api'),
+        'plugin' => env('F_PLUGIN', '9d4095c8f7ed5785cb14c0e3b033eeb8252416ed'),
+        'key' => env('F_API_KEY', 'JDJ5JDEwJHNITDlpZ0ZwMzdyd0RCTzFHVXlUOS5XVnlvaFFjd3ZWcnRBZHBIV0Q5QU5xM1Jqc2lpNlVD'),
+        'secret' => env('F_SECRET_KEY', '')
     ],
 ];
