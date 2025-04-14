@@ -10,8 +10,8 @@ Route::prefix('v1')->group(function () {
 
     // Basic CRUD of invoices
     Route::apiResource('cfdi', CfdiController::class)
-         ->only(['index','show','store'])
-         ->parameters(['cfdi' => 'uuid']);
+        ->only(['index','show','store'])
+        ->parameters(['cfdi' => 'uuid']);
 
     // Specific actions
     Route::post('cfdi/{uuid}/cancel', [CfdiController::class, 'cancel'])->name('cfdi.cancel');

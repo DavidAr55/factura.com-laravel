@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 
 class CfdiController extends Controller
@@ -53,7 +54,7 @@ class CfdiController extends Controller
                 'cancel' => route('cfdi.cancel', ['uuid' => $item['UUID']]),
                 'email'  => route('cfdi.email',  ['uuid' => $item['UUID']]),
                 'self'   => route('cfdi.show',   ['uuid' => $item['UUID']]),
-                'create' => route('cfdi.store'),
+                'store'  => route('cfdi.store'),
             ],
         ], $data['data']);
 
@@ -100,7 +101,7 @@ class CfdiController extends Controller
                 'cancel' => route('cfdi.cancel', ['uuid' => $uuid]),
                 'email'  => route('cfdi.email',  ['uuid' => $uuid]),
                 'self'   => route('cfdi.show',   ['uuid' => $uuid]),
-                'create' => route('cfdi.store'),
+                'store'  => route('cfdi.store'),
             ],
         ], 200);
     }
@@ -112,77 +113,97 @@ class CfdiController extends Controller
      * "CondicionesDePago", "CfdiRelacionados", "Moneda", "TipoCambio", "NumOrder", "FechaFromAPI", "Comentarios",
      * "Cuenta", "EnviarCorreo" and "LugarExpedicion"
      * @param \Illuminate\Http\Request $request
-     * @param array $receiver
-     * @param string $documentType
-     * @param string $draftIfFail (Optional)
-     * @param string $draft (Optional)
-     * @param array $concepts
-     * @param string $cfdiUsage
-     * @param number $serial
-     * @param string $paymentForm
-     * @param string $paymentMethod
-     * @param string $paymentConditions (Optional)
-     * @param array $relatedCfdi (Optional)
-     * @param string $currency
-     * @param string $exchangeRate (Optional/Required in case the currency attribute is different from MXN)
-     * @param string $orderNumber (Optional)
-     * @param string $dateFromApi (Optional)
-     * @param string $comments (Optional)
-     * @param string $account (Optional)
-     * @param bool $sendEmail (Optional)
-     * @param string $placeOfIssue (Optional)
+     * @param array $request->Receptor
+     * @param string $request->TipoDocumento
+     * @param string $request->BorradorSiFalla (Optional)
+     * @param string $request->Draft (Optional)
+     * @param array $request->Conceptos
+     * @param string $request->UsoCFDI
+     * @param number $request->Serie
+     * @param string $request->FormaPago
+     * @param string $request->MetodoPago
+     * @param string $request->CondicionesDePago (Optional)
+     * @param array $request->CfdiRelacionados (Optional)
+     * @param string $request->Moneda
+     * @param string $request->TipoCambio (Optional/Required in case the currency attribute is different from MXN)
+     * @param string $request->NumOrder (Optional)
+     * @param string $request->FechaFromAPI (Optional)
+     * @param string $request->Comentarios (Optional)
+     * @param string $request->Cuenta (Optional)
+     * @param bool $request->EnviarCorreo (Optional)
+     * @param string $request->LugarExpedicion (Optional)
      * @return JsonResponse
      */
     public function store(Request $request): JsonResponse
     {
+        // 1) Validación de la petición usando las claves tal cual vienen en el JSON
         $request->validate([
-            'receiver'          => 'required|array',
-            'documentType'      => 'required|string',
-            'draftIfFail'       => 'nullable|string',
-            'draft'             => 'nullable|string',
-            'concepts'          => 'required|array',
-            'cfdiUsage'         => 'required|string',
-            'serial'            => 'required|numeric',
-            'paymentForm'       => 'required|string',
-            'paymentMethod'     => 'required|string',
-            'paymentConditions' => 'nullable|string',
-            'relatedCfdi'       => 'nullable|array',
-            'currency'          => 'required|string',
-            'exchangeRate'      => 'nullable|string',
-            'orderNumber'       => 'nullable|string',
-            'dateFromApi'       => 'nullable|string',
-            'comments'          => 'nullable|string',
-            'account'           => 'nullable|string',
-            'sendEmail'         => 'nullable|bool',
-            'placeOfIssue'      => 'nullable|string',
+            'Receptor'                      => 'required|array',
+            'Receptor.UID'                  => 'required|string',
+            'Receptor.ResidenciaFiscal'     => 'nullable|string',
+
+            'TipoDocumento'                 => 'required|string',
+            'UsoCFDI'                       => 'required|string',
+            'Serie'                         => 'required|string',
+            'FormaPago'                     => 'required|string',
+            'MetodoPago'                    => 'required|string',
+            'Moneda'                        => 'required|string',
+
+            'Conceptos'                     => 'required|array|min:1',
+            'Conceptos.*.ClaveProdServ'     => 'required|string',
+            'Conceptos.*.Cantidad'          => 'required|numeric',
+            'Conceptos.*.ClaveUnidad'       => 'required|string',
+            'Conceptos.*.Unidad'            => 'required|string',
+            'Conceptos.*.ValorUnitario'     => 'required|numeric',
+            'Conceptos.*.Descripcion'       => 'required|string',
+            'Conceptos.*.ObjetoImp'         => 'required|string',
+
+            'EnviarCorreo'                  => 'nullable|boolean',
+            'BorradorSiFalla'               => 'nullable|boolean',
+            'Draft'                         => 'nullable|boolean',
+            'CondicionesDePago'             => 'nullable|string',
+            'CfdiRelacionados'              => 'nullable|array',
+            'TipoCambio'                    => 'nullable|numeric',
+            'NumOrder'                      => 'nullable|string',
+            'FechaFromAPI'                  => 'nullable|date',
+            'Comentarios'                   => 'nullable|string',
+            'Cuenta'                        => 'nullable|string',
+            'LugarExpedicion'               => 'nullable|string',
         ]);
-        $response = $this->externalClient()->post('/v4/cfdi40/create', [
-            'Receptor'          => $request->receiver,
-            'TipoDocumento'     => $request->documentType,
-            'BorradorSiFalla'   => $request->draftIfFail,
-            'Draft'             => $request->draft,
-            'Conceptos'         => $request->concepts,
-            'UsoCFDI'           => $request->cfdiUsage,
-            'Serie'             => $request->serial,
-            'FormaPago'         => $request->paymentForm,
-            'MetodoPago'        => $request->paymentMethod,
-            'CondicionesDePago' => $request->paymentConditions,
-            'CfdiRelacionados'  => $request->relatedCfdi,
-            'Moneda'            => $request->currency,
-            'TipoCambio'        => $request->exchangeRate,
-            'NumOrder'          => $request->orderNumber,
-            'FechaFromAPI'      => $request->dateFromApi,
-            'Comentarios'       => $request->comments,
-            'Cuenta'            => $request->account,
-            'EnviarCorreo'      => $request->sendEmail,
-            'LugarExpedicion'   => $request->placeOfIssue,
+
+        $payload = $request->only([
+            'Receptor',
+            'TipoDocumento',
+            'UsoCFDI',
+            'Serie',
+            'FormaPago',
+            'MetodoPago',
+            'Moneda',
+            'Conceptos',
+            'EnviarCorreo',
+            'BorradorSiFalla',
+            'Draft',
+            'CondicionesDePago',
+            'CfdiRelacionados',
+            'TipoCambio',
+            'NumOrder',
+            'FechaFromAPI',
+            'Comentarios',
+            'Cuenta',
+            'LugarExpedicion',
         ]);
-        
+
+        $response = $this->externalClient()
+                        ->post('/v4/cfdi40/create', $payload);
+
         if (! $response->successful()) {
             return $this->errorResponse($response);
         }
-    
-        return response()->json($response->json(), 201);
+
+        return response()->json(
+            $response->json(),
+            201
+        );
     }
 
     /**
