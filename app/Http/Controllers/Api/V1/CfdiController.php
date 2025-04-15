@@ -64,7 +64,6 @@ class CfdiController extends Controller
             ];
         }, $data['data']);
 
-        // Return paginated response
         return response()->json([
             'total'        => $data['total'],
             'per_page'     => $data['per_page'],
@@ -94,7 +93,16 @@ class CfdiController extends Controller
 
         $item = $payload['data'];
 
-        // Return transformed object
+        $links = [
+            'email' => route('cfdi.email', ['uuid' => $uuid]),
+            'self'  => route('cfdi.show',  ['uuid' => $uuid]),
+            'store' => route('cfdi.store'),
+        ];
+
+        if ($item['Status'] !== 'cancelada') {
+            $links['cancel'] = route('cfdi.cancel', ['uuid' => $uuid]);
+        }
+
         return response()->json([
             'uuid'       => $item['UUID'],
             'uid'        => $item['UID'],
@@ -104,12 +112,7 @@ class CfdiController extends Controller
             'total'      => $item['Total'],
             'date'       => $item['FechaTimbrado'],
             'status'     => $item['Status'],
-            'links'      => [
-                'cancel' => route('cfdi.cancel', ['uuid' => $uuid]),
-                'email'  => route('cfdi.email',  ['uuid' => $uuid]),
-                'self'   => route('cfdi.show',   ['uuid' => $uuid]),
-                'store'  => route('cfdi.store'),
-            ],
+            'links'      => $links,
         ], 200);
     }
 
