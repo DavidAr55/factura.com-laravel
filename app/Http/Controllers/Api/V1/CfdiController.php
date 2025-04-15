@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 
 class CfdiController extends Controller
@@ -45,13 +46,14 @@ class CfdiController extends Controller
                 'email'  => route('cfdi.email',  ['uuid' => $item['UUID']]),
                 'self'   => route('cfdi.show',   ['uuid' => $item['UUID']]),
             ];
-        
+
             if ($item['Status'] !== 'cancelada') {
                 $links['cancel'] = route('cfdi.cancel', ['uuid' => $item['UUID']]);
             }
-        
+
             return [
                 'uuid'      => $item['UUID'],
+                'uid'       => $item['UID'],
                 'cfdi_type' => $this->getType($item['Folio']),
                 'folio'     => $item['Folio'],
                 'serial'    => $this->getSerial($item['Folio']),
@@ -60,7 +62,7 @@ class CfdiController extends Controller
                 'status'    => $item['Status'],
                 'links'     => $links,
             ];
-        }, $data['data']);        
+        }, $data['data']);
 
         // Return paginated response
         return response()->json([
@@ -95,6 +97,7 @@ class CfdiController extends Controller
         // Return transformed object
         return response()->json([
             'uuid'       => $item['UUID'],
+            'uid'        => $item['UID'],
             'cfdi_type'  => $this->getType($item['Folio']),
             'folio'      => $item['Folio'],
             'serial'     => $item['TipoDocumento'],
@@ -198,7 +201,7 @@ class CfdiController extends Controller
         ]);
 
         $response = $this->externalClient()
-                        ->post('/v4/cfdi40/create', $payload);
+            ->post('/v4/cfdi40/create', $payload);
 
         if (! $response->successful()) {
             return $this->errorResponse($response);
@@ -223,25 +226,46 @@ class CfdiController extends Controller
     {
         $request->validate([
             'reason'          => 'required|string',
-            'substituteFolio' => 'required|string'
+            'substituteFolio' => 'nullable|string',
         ]);
 
-        $response = $this->externalClient()->post("/v4/cfdi40/{$cfdi_uid}/cancel", [
-            'motivo' => $request->reason,
-            'folioSustituto' => $request->substituteFolio
-        ]);
-        
-        if (!$response->successful()) {
+        $payload = ['motivo' => $request->reason];
+        if ($request->reason === '01' && $request->substituteFolio !== null) {
+            $payload['folioSustituto'] = $request->substituteFolio;
+        }
+
+        $response = $this->externalClient()->post("/v4/cfdi40/{$cfdi_uid}/cancel", $payload);
+
+        if (! $response->successful()) {
             return $this->errorResponse($response);
         }
 
-        $data = $response->json();
+        try {
+            $data = $response->json();
 
-        return response()->json([
-            'response'     => $data['response'],
-            'message'      => $data['message'],
-            'api_response' => $data['respuestaapi'],
-        ], 200);
+            return response()->json([
+                'response'     => $data['response'],
+                'message'      => $data['message'],
+                'api_response' => $data['respuestaapi'],
+            ], 200);
+
+        } catch (\Throwable $e) {
+            Log::error('Error parsing cancel response', [
+                'exception' => $e->getMessage(),
+                'body'      => $response->body(),
+            ]);
+
+            $raw = json_decode($response->body(), true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return response()->json([
+                    'response' => 'error',
+                    'message'  => $response->body(),
+                ], 500);
+            }
+
+            return response()->json($raw, 500);
+        }
     }
 
     /**
@@ -253,16 +277,35 @@ class CfdiController extends Controller
     public function sendEmail(string $uuid): JsonResponse
     {
         $response = $this->externalClient()->get("/v4/cfdi40/{$uuid}/email");
-        
+
         if (! $response->successful()) {
             return $this->errorResponse($response);
         }
 
-        return response()->json([
-            'response' => $response['response'],
-            'uuid'     => $uuid,
-            'message'  => $response['message']
-        ], 200);
+        try {
+            $data = $response->json();
+
+            $resp    = $data['response'] ?? 'error';
+            $message = $data['message']  ?? 'Error desconocido';
+
+            return response()->json([
+                'response' => $resp,
+                'uuid'     => $uuid,
+                'message'  => $message,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            Log::error('Error parsing sendEmail response', [
+                'exception' => $e->getMessage(),
+                'body'      => $response->body(),
+            ]);
+
+            return response()->json([
+                'response' => 'error',
+                'uuid'     => $uuid,
+                'message'  => 'Respuesta inválida del servidor externo',
+            ], 500);
+        }
     }
 
 
