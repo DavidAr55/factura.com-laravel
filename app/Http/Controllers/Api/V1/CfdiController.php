@@ -32,7 +32,7 @@ class CfdiController extends Controller
             'year'     => $request->year,
             'rfc'      => $request->rfc,
             'page'     => $request->page,
-            'per_page' => $request->per_page ?: 100,
+            'per_page' => $request->per_page ?: 15,
         ]);
 
         if (!$response->successful()) {
@@ -41,22 +41,27 @@ class CfdiController extends Controller
 
         $data = $response->json();
 
-        // Format items for response
-        $items = array_map(fn($item) => [
-            'uuid'       => $item['UUID'],
-            'cfdi_type'  => $this->getType($item['Folio']),
-            'folio'      => $item['Folio'],
-            'serial'     => $this->getSerial($item['Folio']),
-            'total'      => $item['Total'],
-            'date'       => $item['FechaTimbrado'],
-            'status'     => $item['Status'],
-            'links'      => [
-                'cancel' => route('cfdi.cancel', ['uuid' => $item['UUID']]),
+        $items = array_map(function ($item) {
+            $links = [
                 'email'  => route('cfdi.email',  ['uuid' => $item['UUID']]),
                 'self'   => route('cfdi.show',   ['uuid' => $item['UUID']]),
-                'store'  => route('cfdi.store'),
-            ],
-        ], $data['data']);
+            ];
+        
+            if ($item['Status'] !== 'cancelada') {
+                $links['cancel'] = route('cfdi.cancel', ['uuid' => $item['UUID']]);
+            }
+        
+            return [
+                'uuid'      => $item['UUID'],
+                'cfdi_type' => $this->getType($item['Folio']),
+                'folio'     => $item['Folio'],
+                'serial'    => $this->getSerial($item['Folio']),
+                'total'     => $item['Total'],
+                'date'      => $item['FechaTimbrado'],
+                'status'    => $item['Status'],
+                'links'     => $links,
+            ];
+        }, $data['data']);        
 
         // Return paginated response
         return response()->json([
