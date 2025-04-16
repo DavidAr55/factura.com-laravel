@@ -147,7 +147,7 @@ class CfdiController extends Controller
     public function store(Request $request): JsonResponse
     {
         // 1) Validación de la petición usando las claves tal cual vienen en el JSON
-        $request->validate([
+        /*$request->validate([
             'Receptor'                      => 'required|array',
             'Receptor.UID'                  => 'required|string',
             'Receptor.ResidenciaFiscal'     => 'nullable|string',
@@ -179,7 +179,7 @@ class CfdiController extends Controller
             'Comentarios'                   => 'nullable|string',
             'Cuenta'                        => 'nullable|string',
             'LugarExpedicion'               => 'nullable|string',
-        ]);
+        ]);*/
 
         $payload = $request->only([
             'Receptor',
