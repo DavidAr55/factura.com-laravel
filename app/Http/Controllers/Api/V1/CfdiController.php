@@ -319,73 +319,23 @@ class CfdiController extends Controller
      */
     public function getCfdiTypes(): JsonResponse
     {
-        return response()->json([
-            [
-                'key'    => 'factura',
-                'type'   => 'Factura',
-                'serial' => 'F'
-            ],
-            [
-                'key'    => 'factura_hotel',
-                'type'   => 'Factura para hoteles',
-                'serial' => 'FH'
-            ],
-            [
-                'key'    => 'honorarios',
-                'type'   => 'Recibo de honorarios',
-                'serial' => 'R'
-            ],
-            [
-                'key'    => 'nota_cargo',
-                'type'   => 'Nota de cargo',
-                'serial' => 'NC'
-            ],
-            [
-                'key'    => 'donativos',
-                'type'   => 'Donativo',
-                'serial' => 'DO'
-            ],
-            [
-                'key'    => 'arrendamiento',
-                'type'   => 'Recibo de arrendamiento',
-                'serial' => 'RA'
-            ],
-            [
-                'key'    => 'nota_credito',
-                'type'   => 'Nota de crédito',
-                'serial' => 'N'
-            ],
-            [
-                'key'    => 'nota_debito',
-                'type'   => 'Nota de débito',
-                'serial' => 'D'
-            ],
-            [
-                'key'    => 'nota_devolucion',
-                'type'   => 'Nota de devolución',
-                'serial' => 'ND'
-            ],
-            [
-                'key'    => 'carta_porte',
-                'type'   => 'Carta porte',
-                'serial' => 'C'
-            ],
-            [
-                'key'    => 'carta_porte_ingreso',
-                'type'   => 'Carta porte de Ingreso',
-                'serial' => 'CI'
-            ],/*
-            [
-                'key'    => 'pago',
-                'type'   => 'Pago',
-                'serial' => null
-            ],
-            [
-                'key'    => 'retencion',
-                'type'   => 'Retención',
-                'serial' => null
-            ],*/
-        ]);
+        $response = Http::withHeaders([
+            'F-PLUGIN'     => config('app.factura.plugin'),
+            'F-API-KEY'    => config('app.factura.api_key'),
+            'F-SECRET-KEY' => config('app.factura.secret_key'),
+        ])->get(config('app.factura.host') . '/v4/series');
+
+        if (!$response->successful()) {
+            return response()->json([
+                'message' => 'Error al obtener los datos',
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ], $response->status());
+        }
+
+        $data = $response->json();
+
+        return response()->json($data['data']);
     }
 
     public function cfdiUsage()
