@@ -23,5 +23,8 @@ Route::prefix('v1')->group(function () {
     Route::get('cfdi-types', [CfdiController::class, 'getCfdiTypes'])->name('cfdi.types');
     Route::get('clients', [ClientsController::class, 'index'])->name('clients');
     Route::get('cfdi-usage', [CfdiController::class, 'cfdiUsage'])->name('cfdi.usage');
-    Route::get('payment-methods', [PaymentController::class, 'index'])->name('payment.methods');
+    Route::get('payment-terms', [PaymentController::class, 'terms'])->name('payment.terms');
+    Route::get('payment-methods', [PaymentController::class, 'methods'])->name('payment.methods');
+    Route::get('payment-currency', [PaymentController::class, 'currency'])->name('payment.currency');
+    Route::get('unit', [CfdiController::class, 'unit'])->name('unit');
 });

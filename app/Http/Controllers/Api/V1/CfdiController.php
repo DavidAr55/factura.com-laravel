@@ -27,7 +27,7 @@ class CfdiController extends Controller
             'per_page' => 'nullable|integer',
         ]);
 
-        $response = $this->externalClient()->post('/v4/cfdi/list', [
+        $response = facturaRequest()->post('/v4/cfdi/list', [
             'month'    => $request->month,
             'year'     => $request->year,
             'rfc'      => $request->rfc,
@@ -36,7 +36,7 @@ class CfdiController extends Controller
         ]);
 
         if (!$response->successful()) {
-            return $this->errorResponse($response);
+            return errorResponse($response);
         }
 
         $data = $response->json();
@@ -83,10 +83,10 @@ class CfdiController extends Controller
      */
     public function show(string $uuid): JsonResponse
     {
-        $response = $this->externalClient()->get("/v4/cfdi/uuid/{$uuid}");
+        $response = facturaRequest()->get("/v4/cfdi/uuid/{$uuid}");
 
         if (!$response->successful()) {
-            return $this->errorResponse($response);
+            return errorResponse($response);
         }
 
         $payload = $response->json();
@@ -146,41 +146,6 @@ class CfdiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // 1) Validación de la petición usando las claves tal cual vienen en el JSON
-        /*$request->validate([
-            'Receptor'                      => 'required|array',
-            'Receptor.UID'                  => 'required|string',
-            'Receptor.ResidenciaFiscal'     => 'nullable|string',
-
-            'TipoDocumento'                 => 'required|string',
-            'UsoCFDI'                       => 'required|string',
-            'Serie'                         => 'required|string',
-            'FormaPago'                     => 'required|string',
-            'MetodoPago'                    => 'required|string',
-            'Moneda'                        => 'required|string',
-
-            'Conceptos'                     => 'required|array|min:1',
-            'Conceptos.*.ClaveProdServ'     => 'required|string',
-            'Conceptos.*.Cantidad'          => 'required|numeric',
-            'Conceptos.*.ClaveUnidad'       => 'required|string',
-            'Conceptos.*.Unidad'            => 'required|string',
-            'Conceptos.*.ValorUnitario'     => 'required|numeric',
-            'Conceptos.*.Descripcion'       => 'required|string',
-            'Conceptos.*.ObjetoImp'         => 'required|string',
-
-            'EnviarCorreo'                  => 'nullable|boolean',
-            'BorradorSiFalla'               => 'nullable|boolean',
-            'Draft'                         => 'nullable|boolean',
-            'CondicionesDePago'             => 'nullable|string',
-            'CfdiRelacionados'              => 'nullable|array',
-            'TipoCambio'                    => 'nullable|numeric',
-            'NumOrder'                      => 'nullable|string',
-            'FechaFromAPI'                  => 'nullable|date',
-            'Comentarios'                   => 'nullable|string',
-            'Cuenta'                        => 'nullable|string',
-            'LugarExpedicion'               => 'nullable|string',
-        ]);*/
-
         $payload = $request->only([
             'Receptor',
             'TipoDocumento',
@@ -203,11 +168,11 @@ class CfdiController extends Controller
             'LugarExpedicion',
         ]);
 
-        $response = $this->externalClient()
+        $response = facturaRequest()
             ->post('/v4/cfdi40/create', $payload);
 
         if (! $response->successful()) {
-            return $this->errorResponse($response);
+            return errorResponse($response);
         }
 
         return response()->json(
@@ -237,10 +202,10 @@ class CfdiController extends Controller
             $payload['folioSustituto'] = $request->substituteFolio;
         }
 
-        $response = $this->externalClient()->post("/v4/cfdi40/{$cfdi_uid}/cancel", $payload);
+        $response = facturaRequest()->post("/v4/cfdi40/{$cfdi_uid}/cancel", $payload);
 
         if (! $response->successful()) {
-            return $this->errorResponse($response);
+            return errorResponse($response);
         }
 
         try {
@@ -279,10 +244,10 @@ class CfdiController extends Controller
      */
     public function sendEmail(string $uuid): JsonResponse
     {
-        $response = $this->externalClient()->get("/v4/cfdi40/{$uuid}/email");
+        $response = facturaRequest()->get("/v4/cfdi40/{$uuid}/email");
 
         if (! $response->successful()) {
-            return $this->errorResponse($response);
+            return errorResponse($response);
         }
 
         try {
@@ -338,58 +303,31 @@ class CfdiController extends Controller
         return response()->json($data['data']);
     }
 
-    public function cfdiUsage()
+    public function cfdiUsage(): JsonResponse
     {
-        $response = Http::withHeaders([
-            'F-PLUGIN'     => config('app.factura.plugin'),
-            'F-API-KEY'    => config('app.factura.api_key'),
-            'F-SECRET-KEY' => config('app.factura.secret_key'),
-        ])->get(config('app.factura.host') . '/v4/catalogo/UsoCfdi');
+        $response = facturaRequest()->get('/v4/catalogo/UsoCfdi');
     
         if (!$response->successful()) {
-            return response()->json([
-                'message' => 'Error al obtener los datos',
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ], $response->status());
+            return errorResponse($response);
         }
-
+    
         return response()->json($response->json());
     }
 
-
-
-    /**
-     * Summary of externalClient
-     * externalClient is a method that returns a pending request to the external API
-     * it has the headers and base URL configured to make requests to the external API
-     * it sends the request to a sandbox environment
-     * @return \Illuminate\Http\Client\PendingRequest
-     */
-    private function externalClient(): PendingRequest
+    public function unit(): JsonResponse
     {
-        return Http::withHeaders([
-            'F-PLUGIN'     => config('app.factura.plugin'),
-            'F-API-KEY'    => config('app.factura.api_key'),
-            'F-SECRET-KEY' => config('app.factura.secret_key'),
-        ])->baseUrl(config('app.factura.host'));
+        $response = facturaRequest()->get('/v3/catalogo/ClaveUnidad');
+    
+        if (!$response->successful()) {
+            return errorResponse($response);
+        }
+
+        $data = $response->json();
+    
+        return response()->json($data['data']);
     }
 
-    /**
-     * Summary of errorResponse
-     * errorResponse is a method that returns a JSON response with an error message
-     * @param \Illuminate\Http\Client\Response $response
-     * @return \Illuminate\Http\JsonResponse
-     */
-    private function errorResponse($response): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => 'External API error',
-            'status'  => $response->status(),
-            'body'    => $response->body(),
-        ], 502);
-    }
+
 
     /**
      * Summary of getType
