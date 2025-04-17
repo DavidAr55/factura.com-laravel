@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\V1\CfdiController;
 use App\Http\Controllers\Api\V1\ClientsController;
 use App\Http\Controllers\Api\V1\PaymentController;
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('validate')->group(function () {
     // Health check
     Route::get('health', HealthController::class);
 

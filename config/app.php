@@ -126,6 +126,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Vue app API keys
+    |--------------------------------------------------------------------------
+    |
+    | These configuration options determine the api keys of my frontend server
+    |
+    */
+
+    'vue' => [
+        'api_key' => env('VUE_API_KEY', 'VUE-dfzo6FZOv7Z9629LLc9aO8PaIDxHFLks'),
+        'api_secret' => env('VUE_API_SECRET', '')
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Factura.com API keys
     |--------------------------------------------------------------------------
     |

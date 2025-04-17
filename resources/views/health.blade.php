@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="api-url" content="{{ config('app.url').'/api' }}">
+    <meta name="api-key" content="{{ config('app.vue.api_key') }}">
+    <meta name="api-secret" content="{{ config('app.vue.api_secret') }}">
+    
     <title>Health Check - {{ config('app.name') }}</title>
     <style>
         body {
@@ -52,26 +55,35 @@
         const indicator = document.getElementById('status-indicator');
         const timestamp = document.getElementById('timestamp');
 
-        const API_URL = document.querySelector('meta[name="api-url"]').getAttribute('content');
+        const API_URL  = document.querySelector('meta[name="api-url"]').getAttribute('content');
+        const API_KEY  = document.querySelector('meta[name="api-key"]').getAttribute('content');
+        const SECRET   = document.querySelector('meta[name="api-secret"]').getAttribute('content');
 
-        fetch(`${API_URL}/v1/health`)
-            .then(async response => {
-                const data = await response.json();
-                if (response.ok) {
-                    indicator.textContent = data.status;
-                    indicator.className = 'status-ok';
-                } else {
-                    indicator.textContent = data.status;
-                    indicator.className = 'status-error';
-                }
-                timestamp.textContent = 'As of ' + data.timestamp;
-            })
-            .catch(err => {
-                indicator.textContent = 'ERROR';
+        fetch(`${API_URL}/v1/health`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',  
+                'Authorization': `Bearer ${API_KEY}`,
+                'F-Api-Secret': SECRET
+            }
+        })
+        .then(async response => {
+            const data = await response.json();
+            if (response.ok) {
+                indicator.textContent = data.status;
+                indicator.className = 'status-ok';
+            } else {
+                indicator.textContent = data.status;
                 indicator.className = 'status-error';
-                timestamp.textContent = 'Could not fetch health data';
-                console.error('Health fetch error:', err);
-            });
+            }
+            timestamp.textContent = 'As of ' + data.timestamp;
+        })
+        .catch(err => {
+            indicator.textContent = 'ERROR';
+            indicator.className = 'status-error';
+            timestamp.textContent = 'Could not fetch health data';
+            console.error('Health fetch error:', err);
+        });
     });
     </script>
 </body>
