@@ -236,5 +236,5 @@ Si todo se ejecutó correctamente, podrás acceder a una vista de estado del ser
 
 ## Autor
 
-**David Arvizu**  
+**David Arturo Loera Olmos**  
 [GitHub: DavidAr55](https://github.com/DavidAr55)
