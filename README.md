@@ -1,66 +1,240 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# factura.com-laravel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Este repositorio es una prueba técnica para la empresa **Factura.com**. El objetivo es demostrar conocimientos en desarrollo backend, específicamente consumiendo su API en el entorno **Sandbox**, y cumpliendo con las siguientes funcionalidades:
 
-## About Laravel
+### Funcionalidades requeridas:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+#### Backend (API RESTful con Laravel)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Listado de facturas con las siguientes columnas:
+  - Tipo de documento
+  - Folio
+  - Serie
+  - Total
+  - Fecha
+  - Estatus
+  - Opciones
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Funcionalidades adicionales:
+  - Cancelar CFDI
+  - Enviar CFDI por correo electrónico
+  - Paginación de resultados
+  - Filtrado de resultados
+  - Creación de CFDI
+  - CRUD de clientes (para enviarlos como receptor)
+  - Consumo del API de factura.com
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Configuración del proyecto
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+Para comenzar, creé un proyecto desde cero con **Laravel 12**, configurando CORS desde el inicio (aunque no es parte del requerimiento, lo hago por buenas prácticas). Esto asegura que solo peticiones provenientes de `http://localhost:5173` (mi frontend en Vue 3) puedan acceder al backend.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Archivo `config/cors.php`:
 
-## Laravel Sponsors
+```php
+return [
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'allowed_methods' => ['*'],
+    'allowed_origins' => [
+        env('VUE_URL', 'http://localhost:5173'),
+    ],
+    'allowed_origins_patterns' => [],
+    'allowed_headers' => ['*'],
+    'exposed_headers' => [],
+    'max_age' => 0,
+    'supports_credentials' => false,
+];
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Middleware de validación de API Keys
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+Para asegurar la autenticación entre el frontend y el backend, creé un middleware: `app/Http/Middleware/ValidateApiKey.php`
 
-## Contributing
+```php
+<?php
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+namespace App\Http\Middleware;
 
-## Code of Conduct
+use Closure;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
+use App\Models\ApiKey;
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+class ValidateApiKey
+{
+    public function handle(Request $request, Closure $next)
+    {
+        $publicKey  = $request->bearerToken();
 
-## Security Vulnerabilities
+        $privateKey = $request->header('F-Api-Secret');
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+        if (!$publicKey || !$privateKey) {
+            Log::warning('Missing API credentials');
+            return response()->json([
+                'error'   => 'Missing API credentials',
+                'message' => 'Key and secret are required',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
 
-## License
+        $apiKeyRecord = ApiKey::where('key', $publicKey)->first();
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+        if (!$apiKeyRecord) {
+            Log::warning('Invalid API key', ['key' => $publicKey]);
+            return response()->json([
+                'error'   => 'Invalid key',
+                'message' => 'Provided API key is not valid',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if ($apiKeyRecord->secret !== $privateKey) {
+            Log::warning('Secret mismatch', ['key' => $publicKey]);
+            return response()->json([
+                'error'   => 'Invalid secret',
+                'message' => 'Provided secret does not match',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        Log::info('API key validated', ['key' => $publicKey]);
+        return $next($request);
+    }
+}
+```
+
+Este middleware verifica que el usuario envíe **exclusivamente** las API keys necesarias. Estas claves las generé manualmente y las incluí en un **seeder** para tenerlas disponibles siempre en la base de datos del servidor Laravel.
+
+Variables de entorno necesarias (`.env`):
+
+```env
+VUE_API_KEY=VUE-dfzo6FZOv7Z9629LLc9aO8PaIDxHFLks
+VUE_API_SECRET=VUE-S-BC7DDD9F9DABC7F39F8BEEF721C33-1D1E3
+```
+
+---
+
+## Rutas principales (RESTfull API)
+
+En el archivo `routes/api.php`, definí la arquitectura de la API como lo solicitaban las instrucciones:
+
+```php
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\CfdiController;
+use App\Http\Controllers\Api\V1\ClientsController;
+use App\Http\Controllers\Api\V1\PaymentController;
+
+Route::prefix('v1')->middleware('validate')->group(function () {
+    Route::get('health', HealthController::class);
+
+    Route::apiResource('cfdi', CfdiController::class)
+        ->only(['index','show','store'])
+        ->parameters(['cfdi' => 'uuid']);
+
+    Route::post('cfdi/{uuid}/cancel', [CfdiController::class, 'cancel'])->name('cfdi.cancel');
+    Route::post('cfdi/{uuid}/email',  [CfdiController::class, 'sendEmail'])->name('cfdi.email');
+
+    Route::get('cfdi-types', [CfdiController::class, 'getCfdiTypes'])->name('cfdi.types');
+    Route::get('clients', [ClientsController::class, 'index'])->name('clients');
+    Route::get('cfdi-usage', [CfdiController::class, 'cfdiUsage'])->name('cfdi.usage');
+    Route::get('payment-terms', [PaymentController::class, 'terms'])->name('payment.terms');
+    Route::get('payment-methods', [PaymentController::class, 'methods'])->name('payment.methods');
+    Route::get('payment-currency', [PaymentController::class, 'currency'])->name('payment.currency');
+    Route::get('unit', [CfdiController::class, 'unit'])->name('unit');
+});
+```
+
+Ejemplo de consumo de mi RESTful API 'api/v1/cfdi':
+```json
+{
+    "total": 96,
+    "per_page": 1,
+    "current_page": 1,
+    "last_page": 96,
+    "from": 1,
+    "to": 1,
+    "data": [
+        {
+            "uuid": "b5f5d394-1746-4cbc-be6e-9bbcb4af6f2b",
+            "uid": "680034070a0d6",
+            "cfdi_type": "Factura",
+            "folio": "FH 16",
+            "serial": "FH",
+            "total": "300.000000",
+            "date": "2025-04-16",
+            "status": "enviada",
+            "links": {
+                "email": "http://127.0.0.1:8000/api/v1/cfdi/b5f5d394-1746-4cbc-be6e-9bbcb4af6f2b/email",
+                "self": "http://127.0.0.1:8000/api/v1/cfdi/b5f5d394-1746-4cbc-be6e-9bbcb4af6f2b",
+                "cancel": "http://127.0.0.1:8000/api/v1/cfdi/b5f5d394-1746-4cbc-be6e-9bbcb4af6f2b/cancel"
+            }
+        }
+    ]
+}
+```
+
+> Nota: Para completar el formulario de creación, fue necesario consumir más endpoints del API de Factura.com, como métodos de pago, usos de CFDI, monedas, unidades, etc.
+---
+
+## ¿Cómo ejecutar el backend?
+
+1. Clonar el repositorio:
+
+```bash
+git clone https://github.com/DavidAr55/factura.com-laravel.git
+cd factura.com-laravel
+```
+
+2. Instalar dependencias:
+
+```bash
+composer install
+npm install # (no es estrictamente necesario para el backend, pero lo dejo instalado)
+```
+
+3. Copiar archivo de entorno:
+
+```bash
+cp .env.example .env
+```
+
+4. Agregar claves necesarias al `.env`:
+
+```env
+VUE_API_KEY=VUE-dfzo6FZOv7Z9629LLc9aO8PaIDxHFLks
+VUE_API_SECRET=VUE-S-BC7DDD9F9DABC7F39F8BEEF721C33-1D1E3
+
+F_PLUGIN=9d4095c8f7ed5785cb14c0e3b033eeb8252416ed
+F_SECRET_KEY=JDJ5JDEwJHRXbFROTHNiYzRzTXBkRHNPUVA3WU83Y2hxTHdpZHltOFo5UEdoMXVoakNKWTl5aDQwdTFT
+```
+
+5. Generar la app key:
+
+```bash
+php artisan key:generate
+```
+
+6. Ejecutar migraciones y seeders:
+
+```bash
+php artisan migrate --seed
+```
+
+7. Levantar el servidor:
+
+```bash
+php artisan serve
+```
+
+Si todo se ejecutó correctamente, podrás acceder a una vista de estado del servidor.
+
+> ![Captura servidor](https://github.com/DavidAr55/factura.com-laravel/blob/main/public/Captura%20servidor.png?raw=true)
+
+---
+
+## Autor
+
+**David Arvizu**  
+[GitHub: DavidAr55](https://github.com/DavidAr55)
